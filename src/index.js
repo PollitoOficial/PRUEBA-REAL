@@ -1,0 +1,1 @@
+console.log('Página web básica lista')
