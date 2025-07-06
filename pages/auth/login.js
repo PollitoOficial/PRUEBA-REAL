@@ -1,42 +1,55 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { supabase } from '../../lib/supabase';
+import { useState } from 'react';
+import axios from 'axios';
+import { useRouter } from 'next/router';
 
-export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    const { email, password } = req.body;
+const Login = () => {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
+  const [error, setError] = useState('');
 
-    // Validación básica
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email y contraseña son requeridos' });
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('/api/auth/login', formData);
+      alert(response.data.message);
+      // Almacenar el token en localStorage
+      localStorage.setItem('token', response.data.token);
+      router.push('/'); // Redirigir a la página principal
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al iniciar sesión');
     }
+  };
 
-    // Verificar si el usuario existe
-    const { data: user, error } = await supabase
-      .from('users')  // Asegúrate de que esta tabla exista en tu Supabase
-      .select('*')
-      .eq('email', email)
-      .single();
+  return (
+    <div>
+      <h2>Login</h2>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      <form onSubmit={handleSubmit}>
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          value={formData.email}
+          onChange={handleChange}
+        />
+        <input
+          type="password"
+          name="password"
+          placeholder="Contraseña"
+          value={formData.password}
+          onChange={handleChange}
+        />
+        <button type="submit">Iniciar Sesión</button>
+      </form>
+    </div>
+  );
+};
 
-    if (error || !user) {
-      return res.status(400).json({ error: 'Credenciales incorrectas' });
-    }
-
-    // Verificar la contraseña
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ error: 'Credenciales incorrectas' });
-    }
-
-    // Crear un JWT para la autenticación
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
-    res.status(200).json({ message: 'Login exitoso', token });
-  } else {
-    res.status(405).json({ error: 'Método no permitido' });
-  }
-}
+export default Login;

@@ -1,54 +1,61 @@
-import bcrypt from 'bcryptjs';
-import { supabase } from '../../lib/supabase';
+import { useState } from 'react';
+import axios from 'axios';
+import { useRouter } from 'next/router';
 
-export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    const { email, password, name } = req.body;
+const Register = () => {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: ''
+  });
+  const [error, setError] = useState('');
 
-    // Validación básica
-    if (!email || !password || !name) {
-      return res.status(400).json({ error: 'Todos los campos son requeridos' });
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('/api/auth/register', formData);
+      alert(response.data.message);
+      router.push('/login');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al registrar');
     }
+  };
 
-    // Verificar si el usuario ya existe
-    const { data: existingUser, error: fetchError } = await supabase
-      .from('users')  // Asegúrate de que esta tabla exista en tu Supabase
-      .select('*')
-      .eq('email', email)
-      .single();
+  return (
+    <div>
+      <h2>Registro</h2>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          name="name"
+          placeholder="Nombre"
+          value={formData.name}
+          onChange={handleChange}
+        />
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          value={formData.email}
+          onChange={handleChange}
+        />
+        <input
+          type="password"
+          name="password"
+          placeholder="Contraseña"
+          value={formData.password}
+          onChange={handleChange}
+        />
+        <button type="submit">Registrar</button>
+      </form>
+    </div>
+  );
+};
 
-    if (existingUser) {
-      return res.status(400).json({ error: 'El usuario ya existe' });
-    }
-
-    // Cifrar la contraseña
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Insertar nuevo usuario en la tabla
-    const { data: newUser, error: insertError } = await supabase
-      .from('users')  // Asegúrate de que esta tabla exista en tu Supabase
-      .insert([
-        {
-          name: name,
-          email: email,
-          password: hashedPassword
-        }
-      ])
-      .single();
-
-    if (insertError) {
-      return res.status(500).json({ error: 'Error al registrar el usuario', details: insertError });
-    }
-
-    // Crear un JWT para la autenticación
-    const token = jwt.sign(
-      { id: newUser.id, email: newUser.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
-    res.status(201).json({ message: 'Usuario creado exitosamente', token });
-  } else {
-    res.status(405).json({ error: 'Método no permitido' });
-  }
-}
+export default Register;
